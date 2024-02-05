@@ -1,20 +1,24 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+[Serializable]
 public class RoomData
 {
-    public Constant.RoomType roomType;
-    public Constant.Point pos;
-    public Constant.PathDir connectedDir;
+    public RoomType roomType;
+    public List<Point> points;
+    public Point[] connectedPoint;
     public RoomData beforeNode;
-    public List<RoomData> nextNodeList;
+    [NonSerialized] public List<RoomData> nextNodeList;
+    public int dir;
 
-    public RoomData(Constant.RoomType roomType, int x, int y, Constant.PathDir connectedDir)
+    public RoomData(RoomType roomType, List<Point> points, Point[] connectedPoint, int dir = 0)
     {
         this.roomType = roomType;
-        this.pos = new Constant.Point(x, y);
-        this.connectedDir = connectedDir;
+        this.points = points;
+        this.connectedPoint = connectedPoint;
         nextNodeList = new List<RoomData>();
+        this.dir = dir;
     }
 }

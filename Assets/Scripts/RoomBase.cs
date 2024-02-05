@@ -9,15 +9,25 @@ public class RoomBase : MonoBehaviour
     public RoomData roomData;
     public int roomId;
     [SerializeField] TMP_Text text;
-    [SerializeField] GameObject roomObject;
+    [SerializeField] GameObject[] roomObject;
 
     private void Update()
     {
         text.text = roomId.ToString();
     }
 
-    public void Rotate()
+    public void SetDir(int n)
     {
-        roomObject.transform.Rotate(0, 0, 90);
+        for(int i = 0; i < roomObject.Length; i++)
+        {
+            if (i == n)
+            {
+                roomObject[i].gameObject.SetActive(true);
+            }
+            else
+            {
+                roomObject[i].gameObject.SetActive(false);
+            }
+        }
     }
 }

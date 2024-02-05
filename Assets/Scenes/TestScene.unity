@@ -387,12 +387,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mapData:
-    createRoomCount: 7
+    createRoomCount: 10
     bossRoomCount: 1
     treasureRoomCount: 1
     shopRoomCount: 1
-    smallRoomRatio: 10
-    bigRoomRatio: 0
+    smallRoomRatio: 20
+    bigRoomRatio: 20
+  resume: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

@@ -1,98 +1,143 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+
+using Random = UnityEngine.Random;
 
 public class MapManager : MonoBehaviour
 {
     [SerializeField] MapData mapData;
     int[,] map;
+    public bool resume = false;
+    WaitUntil waitUntilResume;
 
     private void Start()
     {
         map = new int[mapData.createRoomCount * 2, mapData.createRoomCount * 2];
-        CreateRoom();
+        waitUntilResume = new WaitUntil(() => resume);
+        StartCoroutine(CreateRoomRoutine());
     }
 
-    private void CreateRoom()
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            resume = true;
+        }
+    }
+
+
+    IEnumerator CreateRoomRoutine()
     {
         GameObject mapContainer = new GameObject("MapContainer");
-        List<RoomData> roomList = new List<RoomData>();
-        List<RoomData> blockedRooms = new List<RoomData>();
+        List<RoomBase> roomList = new List<RoomBase>();
+        List<RoomBase> blockedRooms = new List<RoomBase>();
 
-        Constant.Point curPoint = new Constant.Point(mapData.createRoomCount, mapData.createRoomCount);
-        roomList.Add(new RoomData(Constant.RoomType.Start, curPoint.x, curPoint.y, Constant.PathDir.None));
+        Queue<RoomData> roomGenQueue = new Queue<RoomData>();
+
+        Point curPoint = new Point(mapData.createRoomCount, mapData.createRoomCount);
+
+        RoomData startRoom = new RoomData(RoomType.Start, new List<Point>() { curPoint }, new Point[] { curPoint, curPoint});
+        RoomBase startRoomInstance = Instantiate(Resources.Load<RoomBase>($"Map/{startRoom.roomType}Room"), mapContainer.transform);
+        startRoomInstance.roomData = startRoom;
+        startRoomInstance.transform.position = new Vector2(startRoom.connectedPoint[0].x * 12, startRoom.connectedPoint[0].y * 12);
+
+        roomList.Add(startRoomInstance);
+        roomGenQueue.Enqueue(startRoom);
+
         map[curPoint.x, curPoint.y] = 1;
+        
+        int leftRoomCount = mapData.createRoomCount -1;
 
-        int curIndex = 0;
+        yield return waitUntilResume;
+        resume = false;
 
-        // 방 공간 생성
-        while (roomList.Count <= mapData.createRoomCount)
+        while (leftRoomCount > 0)
         {
-            RoomData curRoomData = roomList[curIndex];
-            curPoint = curRoomData.pos;
-            Constant.RoomType newRoomType;
+            List<RoomBase> created = new List<RoomBase>();
+            while (roomGenQueue.Count > 0)
+            {
+                RoomData curRoomData = roomGenQueue.Dequeue();
 
-            int randomSize = Random.Range(0, 10000);
-            if (randomSize < mapData.smallRoomRatio * 100)
-            {
-                newRoomType = Constant.RoomType.Small;
-            }
-            else if (randomSize > (100 - mapData.bigRoomRatio) * 100)
-            {
-                newRoomType = Constant.RoomType.Big;
-            }
-            else
-            {
-                newRoomType = Constant.RoomType.Normal;
-            }
+                List<Point[]> creatable = CreatableSpaceCheck(curRoomData);
 
-            List<int> creatable = CreatableCheck(curRoomData, newRoomType, curPoint);  
-
-            if (creatable.Count == 0)
-            {
-                // TODO : 백트래킹? 
-                curIndex--;
-                continue;
-            }
-            else
-            {                
-                int createCount;
-                
-                if (roomList.Count == curIndex + 1 && (mapData.createRoomCount - roomList.Count) > 0)
+                while (creatable.Count > 0)
                 {
-                    createCount = Random.Range(1, creatable.Count);
-                }
-                else
-                {
-                    createCount = Random.Range(0, creatable.Count);
-                }
-                
-                if (createCount > 0)
-                {                    
-                    for (int i = 0; i < createCount; i++)
+                    RoomType newRoomType;
+
+                    int randomSize = Random.Range(0, 10000);
+                    if (randomSize < mapData.smallRoomRatio * 100) { newRoomType = RoomType.Small; }
+                    else if (randomSize > (100 - mapData.bigRoomRatio) * 100)
                     {
-                        int randomDir = Random.Range(0, creatable.Count);
-                        RoomData newRoomData = new RoomData(newRoomType, curPoint.x + Constant.dx[creatable[randomDir]], curPoint.y + Constant.dy[creatable[randomDir]], (Constant.PathDir)creatable[randomDir]);
-                        roomList.Add(newRoomData);
-                        curRoomData.nextNodeList.Add(newRoomData);
-                        newRoomData.beforeNode = curRoomData;
-                        map[curPoint.x + Constant.dx[creatable[randomDir]], curPoint.y + Constant.dy[creatable[randomDir]]] = 1;
-                        creatable.RemoveAt(randomDir);
+                        int randomBig = Random.Range(0, 100);
+                        if (randomBig > 70) { newRoomType = RoomType.Triple; }
+                        else { newRoomType = RoomType.Double; }
                     }
-                }
-                if (curIndex < roomList.Count - 1)
+                    else { newRoomType = RoomType.Normal; }
+
+                    RoomData createdRoom = CreateRoom(creatable[0], newRoomType);
+                    createdRoom.beforeNode = curRoomData;
+                    curRoomData.nextNodeList.Add(createdRoom);
+                    foreach(Point p in createdRoom.points)
+                    {
+                        map[p.x, p.y] = 1;
+                    }
+
+                    RoomBase roomInstance = Instantiate(Resources.Load<RoomBase>($"Map/{createdRoom.roomType}Room"), mapContainer.transform);
+                    roomInstance.roomData = createdRoom;
+                    roomInstance.SetDir(createdRoom.dir);
+                    roomInstance.transform.position = new Vector2(createdRoom.connectedPoint[0].x * 12, createdRoom.connectedPoint[0].y * 12 );
+
+                    GameObject pathInstance = Instantiate(Resources.Load<GameObject>("Map/Path"), roomInstance.transform);
+                    pathInstance.transform.position = new Vector2((roomInstance.roomData.connectedPoint[0].x + roomInstance.roomData.connectedPoint[1].x) * 6, (roomInstance.roomData.connectedPoint[0].y + roomInstance.roomData.connectedPoint[1].y) * 6);
+
+                    created.Add(roomInstance);                 
+
+                    creatable = CreatableSpaceCheck(curRoomData);
+                }               
+            }
+            yield return waitUntilResume;
+            resume = false;
+
+            int removeCount = Random.Range(0, created.Count -1);
+            removeCount = created.Count - removeCount > leftRoomCount ? created.Count - leftRoomCount : removeCount;
+            leftRoomCount -= (created.Count - removeCount);
+
+            for (int i = 0; i < removeCount; i++)
+            {
+                int randomIndex = Random.Range(0, created.Count);
+                created[randomIndex].roomData.beforeNode.nextNodeList.Remove(created[randomIndex].roomData);
+                foreach (Point p in created[randomIndex].roomData.points)
                 {
-                    curIndex++;
-                }             
-            }                                    
+                    map[p.x, p.y] = 0;
+                }
+
+                Destroy(created[randomIndex].gameObject);                 
+                created.RemoveAt(randomIndex);
+            }
+              
+            for(int i = 0; i < created.Count; i++)
+            {
+                roomList.Add(created[i]);
+                roomGenQueue.Enqueue(created[i].roomData);
+            }
+
+            yield return waitUntilResume;
+            resume = false;
         }
         // 방 후처리
         for (int i = 0; i < mapData.createRoomCount; i++)
         {
-            if (roomList[i].nextNodeList.Count == 0 && roomList[i].roomType == Constant.RoomType.Normal)
+            if (roomList[i].roomData.nextNodeList.Count == 0 && roomList[i].roomData.roomType == RoomType.Normal)
             {
                 blockedRooms.Add(roomList[i]);
             }
         }
+        Debug.Log(blockedRooms.Count);
+
+        yield return waitUntilResume;
+        resume = false;
 
         MapData targetData = new MapData(mapData);
         while(blockedRooms.Count > 0)
@@ -101,86 +146,182 @@ public class MapManager : MonoBehaviour
             if (targetData.bossRoomCount > 0)
             {
                 targetData.bossRoomCount--;
-                blockedRooms[randomRoomIndex].roomType = Constant.RoomType.Boss;
+                blockedRooms[randomRoomIndex].roomData.roomType = RoomType.Boss;              
             }
             else if (targetData.treasureRoomCount > 0)
             {
                 targetData.treasureRoomCount--;
-                blockedRooms[randomRoomIndex].roomType = Constant.RoomType.Treasure;
+                blockedRooms[randomRoomIndex].roomData.roomType = RoomType.Treasure;
             }
             else if (targetData.shopRoomCount > 0)
             {
                 targetData.shopRoomCount--;
-                blockedRooms[randomRoomIndex].roomType = Constant.RoomType.Shop;
+                blockedRooms[randomRoomIndex].roomData.roomType = RoomType.Shop;
             }
             else
             {
                 break;
             }
+            RoomBase roomInstance = Instantiate(Resources.Load<RoomBase>($"Map/{blockedRooms[randomRoomIndex].roomData.roomType}Room"), mapContainer.transform);
+            roomInstance.roomData = blockedRooms[randomRoomIndex].roomData;
+            roomInstance.SetDir(blockedRooms[randomRoomIndex].roomData.dir);
+            roomInstance.transform.position = new Vector2(blockedRooms[randomRoomIndex].roomData.connectedPoint[0].x * 12, blockedRooms[randomRoomIndex].roomData.connectedPoint[0].y * 12);
+
+            GameObject pathInstance = Instantiate(Resources.Load<GameObject>("Map/Path"), roomInstance.transform);
+            pathInstance.transform.position = new Vector2((roomInstance.roomData.connectedPoint[0].x + roomInstance.roomData.connectedPoint[1].x) * 6, (roomInstance.roomData.connectedPoint[0].y + roomInstance.roomData.connectedPoint[1].y) * 6);
+
+            Destroy(blockedRooms[randomRoomIndex].gameObject);
+            blockedRooms[randomRoomIndex] = roomInstance;
+
             blockedRooms.RemoveAt(randomRoomIndex);
+            yield return waitUntilResume;
+            resume = false;
         }       
 
         // 최종 생성
+        /*
         for(int i = 0; i < mapData.createRoomCount; i++)
         {
             RoomData curRoomData = roomList[i];
 
             RoomBase roomInstance = Instantiate(Resources.Load<RoomBase>($"Map/{curRoomData.roomType}Room"), mapContainer.transform);
             roomInstance.roomData = curRoomData;
-            roomInstance.roomId = i;
-            roomInstance.transform.position = new Vector2(curRoomData.pos.x * 12, curRoomData.pos.y * 12);
-            if (curRoomData.connectedDir == Constant.PathDir.Top || curRoomData.connectedDir == Constant.PathDir.Bottom)
-            {
-                roomInstance.Rotate();
-            }
-            if (roomInstance.roomData.connectedDir != Constant.PathDir.None)
-            {
-                Instantiate(Resources.Load<GameObject>("Map/Path"), roomInstance.transform, true).transform.position = new Vector2(roomInstance.transform.position.x + (Constant.dx[(int)roomInstance.roomData.connectedDir] * -6), roomInstance.transform.position.y + (Constant.dy[(int)roomInstance.roomData.connectedDir] * -6));
-            }
-        }        
+            roomInstance.roomId = i;                       
+
+            yield return waitUntilResume;
+            resume = false;
+        }     
+        */
     }
 
-    private List<int> CreatableCheck(RoomData curRoomData, Constant.RoomType newRoomType, Constant.Point curPoint)
-    {
-        List<int> creatable = new List<int>();
 
-        if (curRoomData.roomType == Constant.RoomType.Small)
+    private List<Point[]> CreatableSpaceCheck(RoomData curRoomData)
+    {
+        List<Point[]> creatable = new List<Point[]>();
+
+        if (curRoomData.roomType == RoomType.Small)
         {
-            if (curRoomData.connectedDir == Constant.PathDir.Top || curRoomData.connectedDir == Constant.PathDir.Bottom)
+            for (int i = 0; i < curRoomData.points.Count; i++)
             {
-                for (int i = 2; i < Constant.dx.Length; i++)
+                if (curRoomData.dir == 0)
                 {
-                    if (map[curPoint.x + Constant.dx[i], curPoint.y + Constant.dy[i]] == 0)
+                    for (int j = 0; j < 2; j++)
                     {
-                        creatable.Add(i);
+                        if (map[curRoomData.points[i].x + Constant.dir[j].x, curRoomData.points[i].y + Constant.dir[j].y] == 0)
+                        {
+                            creatable.Add(new Point[] { curRoomData.points[i] + Constant.dir[j], curRoomData.points[i] });
+                        }
+                    }
+                }
+                else
+                {
+                    for (int j = 2; j < 4; j++)
+                    {
+                        if (map[curRoomData.points[i].x + Constant.dir[j].x, curRoomData.points[i].y + Constant.dir[j].y] == 0)
+                        {
+                            creatable.Add(new Point[] { curRoomData.points[i] + Constant.dir[j], curRoomData.points[i] });
+                        }
                     }
                 }
             }
-            else
-            {
-                for (int i = 0; i < 2; i++)
-                {
-                    if (map[curPoint.x + Constant.dx[i], curPoint.y + Constant.dy[i]] == 0)
-                    {
-                        creatable.Add(i);
-                    }
-                }
-            }
-        }
-        else if (curRoomData.roomType == Constant.RoomType.Big)
-        {
-            
         }
         else
         {
-            for (int i = 0; i < Constant.dx.Length; i++)
+            for (int i = 0; i < curRoomData.points.Count; i++)
             {
-                if (map[curPoint.x + Constant.dx[i], curPoint.y + Constant.dy[i]] == 0)
+                for (int j = 0; j < Constant.dir.Length; j++)
                 {
-                    creatable.Add(i);
+                    if (map[curRoomData.points[i].x + Constant.dir[j].x, curRoomData.points[i].y + Constant.dir[j].y] == 0)
+                    {
+                        creatable.Add(new Point[] { curRoomData.points[i] + Constant.dir[j], curRoomData.points[i] });
+                    }
                 }
             }
-        }       
+        }                
         return creatable;
     }
+
+    private RoomData CreateRoom(Point[] point, RoomType roomType)
+    {
+        RoomData newRoomData;
+        if (roomType == RoomType.Double)
+        {
+            List<DoubleRoomDir> randomDirList = new List<DoubleRoomDir>();
+            foreach (DoubleRoomDir dir in Enum.GetValues(typeof(DoubleRoomDir)))
+            {
+                randomDirList.Add(dir);
+            }
+
+            while (randomDirList.Count > 0)
+            {
+                int randomIndex = Random.Range(0, randomDirList.Count);
+                foreach (DoubleRoomDir dir in Enum.GetValues(typeof(DoubleRoomDir)))
+                {
+                    if (randomDirList[randomIndex] == dir)
+                    {
+                        if (map[point[0].x + Constant.dir[(int)dir].x, point[0].y + Constant.dir[(int)dir].y] == 0)
+                        {
+                            newRoomData = new RoomData(roomType, new List<Point>() { point[0], point[0] + Constant.dir[(int)dir] }, point, (int)dir);
+                            return newRoomData;
+                        }
+                    }
+                }
+            }
+            newRoomData = new RoomData(RoomType.Normal, new List<Point>() { point[0] }, point);
+        }
+        else if (roomType == RoomType.Triple)
+        {
+            List<TripleRoomDir> randomDirList = new List<TripleRoomDir>();
+            foreach (TripleRoomDir dir in Enum.GetValues(typeof(TripleRoomDir)))
+            {
+                randomDirList.Add(dir);
+            }
+            
+            while (randomDirList.Count > 0)
+            {
+                int randomIndex = Random.Range(0, randomDirList.Count);
+                foreach (TripleRoomDir dir in Enum.GetValues(typeof(TripleRoomDir)))
+                {
+                    if (randomDirList[randomIndex] == dir)
+                    {
+                        bool canCreate = true;
+                        List<Point> points = new List<Point>();
+                        points.Add(point[0]);
+
+                        for (int i = 0; i < Constant.tripleRoomCheck.GetLength(1); i++)
+                        {
+                            if (map[point[0].x + Constant.tripleRoomCheck[(int)dir, i].x, point[0].y + Constant.tripleRoomCheck[(int)dir, i].y] == 1)
+                            {
+                                canCreate = false;
+                                break;
+                            }
+                            else
+                            {
+                                points.Add(point[0] + Constant.tripleRoomCheck[(int)dir, i]);
+                            }
+                        }
+                        if (canCreate)
+                        {
+                            newRoomData = new RoomData(roomType, points, point, (int)dir);
+                            return newRoomData;
+                        }
+                    }
+                }
+            }
+            newRoomData = new RoomData(RoomType.Normal, new List<Point>() { point[0] }, point);
+        }
+        else
+        {
+            if (point[0].x == point[1].x)
+            {
+                newRoomData = new RoomData(roomType, new List<Point>() { point[0] }, point, 1);
+            }
+            else
+            {
+                newRoomData = new RoomData(roomType, new List<Point>() { point[0] }, point, 0);
+            }
+        }
+        return newRoomData;
+    }
+
 }
