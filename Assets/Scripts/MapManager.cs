@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Events;
 using Random = UnityEngine.Random;
@@ -8,12 +9,17 @@ using Random = UnityEngine.Random;
 public class MapManager : MonoBehaviour
 {
     [SerializeField] public MapData mapData;
-    [SerializeField] Camera cam;
+    Camera cam;
     int[,] map;
     public bool resume = false;
     WaitUntil waitUntilResume;
 
     public UnityEvent<int, int> RoomCountChanged = new UnityEvent<int, int>();
+
+    private void Awake()
+    {
+        cam = FindObjectOfType<Camera>();
+    }
 
     private void Start()
     {
@@ -35,7 +41,8 @@ public class MapManager : MonoBehaviour
         GameObject mapContainer = new GameObject("MapContainer");
         List<RoomBase> roomList = new List<RoomBase>();
         List<RoomBase> blockedRooms = new List<RoomBase>();
-
+        int bossRoomIndex = 0;
+        
         Queue<RoomData> roomGenQueue = new Queue<RoomData>();
 
         Point curPoint = new Point(mapData.createRoomCount, mapData.createRoomCount);
@@ -158,7 +165,8 @@ public class MapManager : MonoBehaviour
             if (targetData.bossRoomCount > 0)
             {
                 targetData.bossRoomCount--;
-                blockedRooms[randomRoomIndex].roomData.roomType = RoomType.Boss;              
+                blockedRooms[randomRoomIndex].roomData.roomType = RoomType.Boss;
+                bossRoomIndex = blockedRooms[randomRoomIndex].RoomId;
             }
             else if (targetData.treasureRoomCount > 0)
             {
@@ -189,22 +197,11 @@ public class MapManager : MonoBehaviour
             blockedRooms.RemoveAt(randomRoomIndex);
             yield return waitUntilResume;
             resume = false;
-        }       
+        }
 
-        // 최종 생성
-        /*
-        for(int i = 0; i < mapData.createRoomCount; i++)
-        {
-            RoomData curRoomData = roomList[i];
+        Debug.Log("Create Completed!");
 
-            RoomBase roomInstance = Instantiate(Resources.Load<RoomBase>($"Map/{curRoomData.roomType}Room"), mapContainer.transform);
-            roomInstance.roomData = curRoomData;
-            roomInstance.roomId = i;                       
-
-            yield return waitUntilResume;
-            resume = false;
-        }     
-        */
+        //FindPath(roomList[0].roomData, roomList[bossRoomIndex].roomData);
     }
 
 
@@ -335,6 +332,15 @@ public class MapManager : MonoBehaviour
             }
         }
         return newRoomData;
+    }
+
+    private List<RoomData> FindPath(RoomData start, RoomData dest)
+    {
+        List<RoomData> path = new List<RoomData>();
+        
+        // 깊이를 기준으로 부모 검사
+
+        return path;
     }
 
 }

@@ -1,5 +1,7 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public static class Constant
@@ -18,7 +20,7 @@ public static class Constant
     };
 }
 
-public struct Point
+public struct Point 
 {
     public int x, y;
 
@@ -33,7 +35,17 @@ public struct Point
         return new Point(a.x+b.x, a.y+b.y);
     }
 
+    public static bool operator == (Point a, Point b)
+    {
+        return a.x == b.x && a.y == b.y;
+    }
+
+    public static bool operator != (Point a, Point b)
+    {
+        return a.x != b.x || a.y != b.y;
+    }
 }
+
 
 public enum RoomType { Start, Boss, Normal, Double, Triple, Small, Shop, Treasure };
 public enum DoubleRoomDir { Left, Right, Up, Down }
