@@ -2,15 +2,18 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+using UnityEngine.Events;
 using Random = UnityEngine.Random;
 
 public class MapManager : MonoBehaviour
 {
-    [SerializeField] MapData mapData;
+    [SerializeField] public MapData mapData;
+    [SerializeField] Camera cam;
     int[,] map;
     public bool resume = false;
     WaitUntil waitUntilResume;
+
+    public UnityEvent<int, int> RoomCountChanged = new UnityEvent<int, int>();
 
     private void Start()
     {
@@ -27,7 +30,6 @@ public class MapManager : MonoBehaviour
         }
     }
 
-
     IEnumerator CreateRoomRoutine()
     {
         GameObject mapContainer = new GameObject("MapContainer");
@@ -42,9 +44,13 @@ public class MapManager : MonoBehaviour
         RoomBase startRoomInstance = Instantiate(Resources.Load<RoomBase>($"Map/{startRoom.roomType}Room"), mapContainer.transform);
         startRoomInstance.roomData = startRoom;
         startRoomInstance.transform.position = new Vector2(startRoom.connectedPoint[0].x * 12, startRoom.connectedPoint[0].y * 12);
+        cam.transform.position = new Vector3(startRoom.connectedPoint[0].x * 12, startRoom.connectedPoint[0].y * 12, -10);
 
         roomList.Add(startRoomInstance);
         roomGenQueue.Enqueue(startRoom);
+
+        
+        RoomCountChanged?.Invoke(roomList.Count, 0);
 
         map[curPoint.x, curPoint.y] = 1;
         
@@ -87,12 +93,15 @@ public class MapManager : MonoBehaviour
                     RoomBase roomInstance = Instantiate(Resources.Load<RoomBase>($"Map/{createdRoom.roomType}Room"), mapContainer.transform);
                     roomInstance.roomData = createdRoom;
                     roomInstance.SetDir(createdRoom.dir);
+                    roomInstance.RoomId = roomList.Count + created.Count;
                     roomInstance.transform.position = new Vector2(createdRoom.connectedPoint[0].x * 12, createdRoom.connectedPoint[0].y * 12 );
 
                     GameObject pathInstance = Instantiate(Resources.Load<GameObject>("Map/Path"), roomInstance.transform);
                     pathInstance.transform.position = new Vector2((roomInstance.roomData.connectedPoint[0].x + roomInstance.roomData.connectedPoint[1].x) * 6, (roomInstance.roomData.connectedPoint[0].y + roomInstance.roomData.connectedPoint[1].y) * 6);
 
-                    created.Add(roomInstance);                 
+                    created.Add(roomInstance);
+
+                    RoomCountChanged?.Invoke(roomList.Count, created.Count);
 
                     creatable = CreatableSpaceCheck(curRoomData);
                 }               
@@ -115,11 +124,14 @@ public class MapManager : MonoBehaviour
 
                 Destroy(created[randomIndex].gameObject);                 
                 created.RemoveAt(randomIndex);
+
+                RoomCountChanged?.Invoke(roomList.Count, created.Count);
             }
               
             for(int i = 0; i < created.Count; i++)
             {
                 roomList.Add(created[i]);
+                created[i].RoomId = roomList.Count - 1;
                 roomGenQueue.Enqueue(created[i].roomData);
             }
 
@@ -129,7 +141,7 @@ public class MapManager : MonoBehaviour
         // 방 후처리
         for (int i = 0; i < mapData.createRoomCount; i++)
         {
-            if (roomList[i].roomData.nextNodeList.Count == 0 && roomList[i].roomData.roomType == RoomType.Normal)
+            if (roomList[i].roomData.nextNodeList.Count == 0 && (roomList[i].roomData.roomType == RoomType.Normal || roomList[i].roomData.roomType == RoomType.Small))
             {
                 blockedRooms.Add(roomList[i]);
             }
@@ -165,6 +177,7 @@ public class MapManager : MonoBehaviour
             RoomBase roomInstance = Instantiate(Resources.Load<RoomBase>($"Map/{blockedRooms[randomRoomIndex].roomData.roomType}Room"), mapContainer.transform);
             roomInstance.roomData = blockedRooms[randomRoomIndex].roomData;
             roomInstance.SetDir(blockedRooms[randomRoomIndex].roomData.dir);
+            roomInstance.RoomId = blockedRooms[randomRoomIndex].RoomId;
             roomInstance.transform.position = new Vector2(blockedRooms[randomRoomIndex].roomData.connectedPoint[0].x * 12, blockedRooms[randomRoomIndex].roomData.connectedPoint[0].y * 12);
 
             GameObject pathInstance = Instantiate(Resources.Load<GameObject>("Map/Path"), roomInstance.transform);

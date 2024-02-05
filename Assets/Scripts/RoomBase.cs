@@ -2,18 +2,29 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 public class RoomBase : MonoBehaviour 
 {
     public RoomData roomData;
-    public int roomId;
+    private int roomId;
+
     [SerializeField] TMP_Text text;
     [SerializeField] GameObject[] roomObject;
 
-    private void Update()
+    public int RoomId { get { return roomId; } set { roomId = value; roomIdChanged?.Invoke(roomId); } }
+
+    UnityEvent<int> roomIdChanged = new UnityEvent<int>();
+
+    private void OnEnable()
     {
-        text.text = roomId.ToString();
+        roomIdChanged.AddListener(ChangeText);
+    }
+
+    private void OnDisable()
+    {
+        roomIdChanged.RemoveListener(ChangeText);
     }
 
     public void SetDir(int n)
@@ -29,5 +40,10 @@ public class RoomBase : MonoBehaviour
                 roomObject[i].gameObject.SetActive(false);
             }
         }
+    }
+
+    private void ChangeText(int roomId)
+    {
+        text.text = roomId.ToString();
     }
 }
