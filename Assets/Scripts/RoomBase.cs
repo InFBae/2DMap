@@ -46,4 +46,9 @@ public class RoomBase : MonoBehaviour
     {
         text.text = roomId.ToString();
     }
+
+    public void ChangeColor(Color color)
+    {
+        GetComponent<SpriteRenderer>().color = color;
+    }
 }

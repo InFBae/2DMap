@@ -8,12 +8,13 @@ public class RoomData
 {
     public RoomType roomType;
     public List<Point> points;
-    public Point[] connectedPoint;
+    public Point connectedPoint;
     public RoomData beforeNode;
     [NonSerialized] public List<RoomData> nextNodeList;
     public int dir;
+    public int depth;
 
-    public RoomData(RoomType roomType, List<Point> points, Point[] connectedPoint, int dir = 0)
+    public RoomData(RoomType roomType, List<Point> points, Point connectedPoint, int dir = 0)
     {
         this.roomType = roomType;
         this.points = points;

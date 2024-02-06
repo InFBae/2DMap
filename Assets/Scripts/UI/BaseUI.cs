@@ -9,8 +9,8 @@ public class BaseUI : MonoBehaviour
     protected Dictionary<string, RectTransform> transforms;
     protected Dictionary<string, Button> buttons;
     protected Dictionary<string, TMP_Text> texts;
-    protected Dictionary<string, Slider> sliders;
     protected Dictionary<string, Image> images;
+    protected Dictionary<string, TMP_InputField> inputFields;
     // TODO : add ui component
 
     protected virtual void Awake()
@@ -23,8 +23,8 @@ public class BaseUI : MonoBehaviour
         transforms = new Dictionary<string, RectTransform>();
         buttons = new Dictionary<string, Button>();
         texts = new Dictionary<string, TMP_Text>();
-        sliders = new Dictionary<string, Slider>();
         images = new Dictionary<string, Image>();
+        inputFields = new Dictionary<string, TMP_InputField>();
 
         RectTransform[] children = GetComponentsInChildren<RectTransform>();
         foreach (RectTransform child in children)
@@ -44,13 +44,13 @@ public class BaseUI : MonoBehaviour
             if (text != null)
                 texts.Add(key, text);
 
-            Slider slider = child.GetComponent<Slider>();
-            if (slider != null)
-                sliders.Add(key, slider);
-
             Image image = child.GetComponent<Image>();
             if (image != null)
                 images.Add(key, image);
+
+            TMP_InputField inputField = child.GetComponent<TMP_InputField>();
+            if (inputField != null)
+                inputFields.Add(key, inputField);
         }
     }
 
