@@ -10,6 +10,7 @@ using Random = UnityEngine.Random;
 public class MapManager : MonoBehaviour
 {
     [SerializeField] MapDataUI mapDataUI;
+    [SerializeField] PlayerController playerController;
     public MapData targetData;
     Camera cam;
 
@@ -198,6 +199,11 @@ public class MapManager : MonoBehaviour
         }
 
         Debug.Log("Create Completed!");
+
+        playerController.gameObject.SetActive(true);
+        playerController.curRoom = startRoomInstance;
+        playerController.transform.position = startRoomInstance.transform.position;
+        playerController.mapManager = this;
     }
 
     private void QuickCreateMap()
@@ -339,10 +345,16 @@ public class MapManager : MonoBehaviour
         RoomCountChanged?.Invoke(roomList.Count, 0);
 
         Debug.Log("Create Completed!");
+
+        playerController.gameObject.SetActive(true);
+        playerController.curRoom = startRoomInstance;
+        playerController.transform.position = startRoomInstance.transform.position;
+        playerController.mapManager = this;
     }
 
     public void ResetMap()
     {
+        playerController.gameObject.SetActive(false);
         if (mapContainer != null)
         {
             Destroy(mapContainer);
@@ -481,7 +493,7 @@ public class MapManager : MonoBehaviour
         return newRoomData;
     }
 
-    private List<RoomData> FindPath(RoomData start, RoomData dest)
+    public List<RoomData> FindPath(RoomData start, RoomData dest)
     {
         List<RoomData> path = new List<RoomData>();
         Stack<RoomData> pathStack = new Stack<RoomData>();
