@@ -374,29 +374,13 @@ public class MapManager : MonoBehaviour
 
         if (curRoomData.roomType == RoomType.Small)
         {
-            for (int i = 0; i < curRoomData.points.Count; i++)
+            for (int j = curRoomData.dir * 2; j < (curRoomData.dir * 2) + 2; j++)
             {
-                if (curRoomData.dir == 0)
+                if (!map.Contains(new Point(curRoomData.points[0] + Constant.dir[j])))
                 {
-                    for (int j = 0; j < 2; j++)
-                    {
-                        if (!map.Contains(new Point(curRoomData.points[i] + Constant.dir[j])))
-                        {
-                            creatable.Add(new Point[] { curRoomData.points[i] + Constant.dir[j], curRoomData.points[i] });
-                        }
-                    }
+                    creatable.Add(new Point[] { curRoomData.points[0] + Constant.dir[j], curRoomData.points[0] });
                 }
-                else
-                {
-                    for (int j = 2; j < 4; j++)
-                    {
-                        if (!map.Contains(new Point(curRoomData.points[i] + Constant.dir[j])))
-                        {
-                            creatable.Add(new Point[] { curRoomData.points[i] + Constant.dir[j], curRoomData.points[i] });
-                        }
-                    }
-                }
-            }
+            }           
         }
         else
         {
