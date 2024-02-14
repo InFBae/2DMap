@@ -16,7 +16,7 @@ public class MapManager : MonoBehaviour
 
     public bool quickMake;
 
-    int[,] map;
+    HashSet<Point> map;
     GameObject mapContainer;
     public bool resume = false;
     WaitUntil waitUntilResume;
@@ -27,13 +27,14 @@ public class MapManager : MonoBehaviour
     {
         cam = FindObjectOfType<Camera>();
         waitUntilResume = new WaitUntil(() => resume);
+        map = new HashSet<Point>(); 
     }
 
     public void StartCreate()
     {
         ResetMap();
         targetData = new MapData(mapDataUI.mapData);
-        map = new int[targetData.createRoomCount * 2, targetData.createRoomCount * 2];
+        map.Clear();
         if (quickMake) { QuickCreateMap(); }
         else { StartCoroutine(CreateMapRoutine()); }
     }
@@ -43,11 +44,10 @@ public class MapManager : MonoBehaviour
         mapContainer = new GameObject("MapContainer");
         List<RoomBase> roomList = new List<RoomBase>();
         List<RoomBase> blockedRooms = new List<RoomBase>();
-        int bossRoomIndex = 0;
         
         Queue<RoomData> roomGenQueue = new Queue<RoomData>();
 
-        Point curPoint = new Point(this.targetData.createRoomCount, this.targetData.createRoomCount);
+        Point curPoint = new Point(targetData.createRoomCount, targetData.createRoomCount);
 
         RoomData startRoom = new RoomData(RoomType.Start, new List<Point>() { curPoint }, curPoint);
         startRoom.depth = 0;
@@ -61,14 +61,14 @@ public class MapManager : MonoBehaviour
 
         RoomCountChanged?.Invoke(roomList.Count);
 
-        map[curPoint.x, curPoint.y] = 1;
+        map.Add(new Point(curPoint));
         
-        int leftRoomCount = this.targetData.createRoomCount -1;
+        int leftRoomCount = targetData.createRoomCount -1;
 
         yield return waitUntilResume;
         resume = false;
 
-        while (leftRoomCount > 0)
+        while (leftRoomCount > 0 )
         {
             List<RoomBase> created = new List<RoomBase>();
             while (roomGenQueue.Count > 0)
@@ -82,8 +82,8 @@ public class MapManager : MonoBehaviour
                     RoomType newRoomType;
 
                     int randomSize = Random.Range(0, 10000);
-                    if (randomSize < this.targetData.smallRoomRatio * 100) { newRoomType = RoomType.Small; }
-                    else if (randomSize > (100 - this.targetData.bigRoomRatio) * 100)
+                    if (randomSize < targetData.smallRoomRatio * 100) { newRoomType = RoomType.Small; }
+                    else if (randomSize > (100 - targetData.bigRoomRatio) * 100)
                     {
                         int randomBig = Random.Range(0, 100);
                         if (randomBig > 70) { newRoomType = RoomType.Triple; }
@@ -97,7 +97,7 @@ public class MapManager : MonoBehaviour
                     curRoomData.nextNodeList.Add(createdRoom);
                     foreach(Point p in createdRoom.points)
                     {
-                        map[p.x, p.y] = 1;
+                        map.Add(p);
                     }
 
                     RoomBase roomInstance = Instantiate(Resources.Load<RoomBase>($"Map/{createdRoom.roomType}Room"), mapContainer.transform);
@@ -129,7 +129,7 @@ public class MapManager : MonoBehaviour
                 created[randomIndex].roomData.beforeNode.nextNodeList.Remove(created[randomIndex].roomData);
                 foreach (Point p in created[randomIndex].roomData.points)
                 {
-                    map[p.x, p.y] = 0;
+                    map.Remove(p);
                 }
 
                 Destroy(created[randomIndex].gameObject);                 
@@ -151,7 +151,7 @@ public class MapManager : MonoBehaviour
         // 规 饶贸府
         for (int i = 0; i < this.targetData.createRoomCount; i++)
         {
-            if (roomList[i].roomData.nextNodeList.Count == 0 && (roomList[i].roomData.roomType == RoomType.Normal || roomList[i].roomData.roomType == RoomType.Small))
+            if (roomList[i].roomData.nextNodeList.Count == 0)
             {
                 blockedRooms.Add(roomList[i]);
             }
@@ -164,17 +164,19 @@ public class MapManager : MonoBehaviour
             {
                 targetData.bossRoomCount--;
                 blockedRooms[randomRoomIndex].roomData.roomType = RoomType.Boss;
-                bossRoomIndex = blockedRooms[randomRoomIndex].RoomId;
+                blockedRooms[randomRoomIndex].roomData.dir %= 2;
             }
             else if (targetData.treasureRoomCount > 0)
             {
                 targetData.treasureRoomCount--;
                 blockedRooms[randomRoomIndex].roomData.roomType = RoomType.Treasure;
+                blockedRooms[randomRoomIndex].roomData.dir %= 2;
             }
             else if (targetData.shopRoomCount > 0)
             {
                 targetData.shopRoomCount--;
                 blockedRooms[randomRoomIndex].roomData.roomType = RoomType.Shop;
+                blockedRooms[randomRoomIndex].roomData.dir %= 2;
             }
             else
             {
@@ -214,7 +216,7 @@ public class MapManager : MonoBehaviour
 
         Queue<RoomData> roomGenQueue = new Queue<RoomData>();
 
-        Point curPoint = new Point(this.targetData.createRoomCount, this.targetData.createRoomCount);
+        Point curPoint = new Point(targetData.createRoomCount, targetData.createRoomCount);
 
         RoomData startRoom = new RoomData(RoomType.Start, new List<Point>() { curPoint }, curPoint);
         startRoom.depth = 0;
@@ -224,9 +226,8 @@ public class MapManager : MonoBehaviour
         roomList.Add(startRoom);
         roomGenQueue.Enqueue(startRoom);
 
-        map[curPoint.x, curPoint.y] = 1;
-
-        int leftRoomCount = this.targetData.createRoomCount - 1;
+        map.Add(new Point(curPoint));
+        int leftRoomCount = targetData.createRoomCount - 1;
 
         while (leftRoomCount > 0)
         {
@@ -242,8 +243,8 @@ public class MapManager : MonoBehaviour
                     RoomType newRoomType;
 
                     int randomSize = Random.Range(0, 10000);
-                    if (randomSize < this.targetData.smallRoomRatio * 100) { newRoomType = RoomType.Small; }
-                    else if (randomSize > (100 - this.targetData.bigRoomRatio) * 100)
+                    if (randomSize < targetData.smallRoomRatio * 100) { newRoomType = RoomType.Small; }
+                    else if (randomSize > (100 - targetData.bigRoomRatio) * 100)
                     {
                         int randomBig = Random.Range(0, 100);
                         if (randomBig > 70) { newRoomType = RoomType.Triple; }
@@ -257,7 +258,7 @@ public class MapManager : MonoBehaviour
                     curRoomData.nextNodeList.Add(createdRoom);
                     foreach (Point p in createdRoom.points)
                     {
-                        map[p.x, p.y] = 1;
+                        map.Add(p);
                     }
 
                     created.Add(createdRoom);
@@ -276,7 +277,7 @@ public class MapManager : MonoBehaviour
                 created[randomIndex].beforeNode.nextNodeList.Remove(created[randomIndex]);
                 foreach (Point p in created[randomIndex].points)
                 {
-                    map[p.x, p.y] = 0;
+                    map.Remove(p);
                 }
 
                 created.RemoveAt(randomIndex);
@@ -291,9 +292,9 @@ public class MapManager : MonoBehaviour
             }
         }
         // 规 饶贸府
-        for (int i = 0; i < this.targetData.createRoomCount; i++)
+        for (int i = 0; i < targetData.createRoomCount; i++)
         {
-            if (roomList[i].nextNodeList.Count == 0 && (roomList[i].roomType == RoomType.Normal || roomList[i].roomType == RoomType.Small))
+            if (roomList[i].nextNodeList.Count == 0)
             {
                 blockedRooms.Add(roomList[i]);
             }
@@ -306,16 +307,19 @@ public class MapManager : MonoBehaviour
             {
                 targetData.bossRoomCount--;
                 blockedRooms[randomRoomIndex].roomType = RoomType.Boss;
+                blockedRooms[randomRoomIndex].dir %= 2;
             }
             else if (targetData.treasureRoomCount > 0)
             {
                 targetData.treasureRoomCount--;
                 blockedRooms[randomRoomIndex].roomType = RoomType.Treasure;
+                blockedRooms[randomRoomIndex].dir %= 2;
             }
             else if (targetData.shopRoomCount > 0)
             {
                 targetData.shopRoomCount--;
                 blockedRooms[randomRoomIndex].roomType = RoomType.Shop;
+                blockedRooms[randomRoomIndex].dir %= 2;
             }
             else
             {
@@ -376,7 +380,7 @@ public class MapManager : MonoBehaviour
                 {
                     for (int j = 0; j < 2; j++)
                     {
-                        if (map[curRoomData.points[i].x + Constant.dir[j].x, curRoomData.points[i].y + Constant.dir[j].y] == 0)
+                        if (!map.Contains(new Point(curRoomData.points[i] + Constant.dir[j])))
                         {
                             creatable.Add(new Point[] { curRoomData.points[i] + Constant.dir[j], curRoomData.points[i] });
                         }
@@ -386,7 +390,7 @@ public class MapManager : MonoBehaviour
                 {
                     for (int j = 2; j < 4; j++)
                     {
-                        if (map[curRoomData.points[i].x + Constant.dir[j].x, curRoomData.points[i].y + Constant.dir[j].y] == 0)
+                        if (!map.Contains(new Point(curRoomData.points[i] + Constant.dir[j])))
                         {
                             creatable.Add(new Point[] { curRoomData.points[i] + Constant.dir[j], curRoomData.points[i] });
                         }
@@ -400,7 +404,7 @@ public class MapManager : MonoBehaviour
             {
                 for (int j = 0; j < Constant.dir.Length; j++)
                 {
-                    if (map[curRoomData.points[i].x + Constant.dir[j].x, curRoomData.points[i].y + Constant.dir[j].y] == 0)
+                    if (!map.Contains(new Point(curRoomData.points[i] + Constant.dir[j])))
                     {
                         creatable.Add(new Point[] { curRoomData.points[i] + Constant.dir[j], curRoomData.points[i] });
                     }
@@ -428,13 +432,14 @@ public class MapManager : MonoBehaviour
                 {
                     if (randomDirList[randomIndex] == dir)
                     {
-                        if (map[point[0].x + Constant.dir[(int)dir].x, point[0].y + Constant.dir[(int)dir].y] == 0)
+                        if (!map.Contains(new Point(point[0] + Constant.dir[(int)dir])))
                         {
                             newRoomData = new RoomData(roomType, new List<Point>() { point[0], point[0] + Constant.dir[(int)dir] }, point[1], (int)dir);
                             return newRoomData;
                         }
                     }
                 }
+                randomDirList.RemoveAt(randomIndex);
             }
             newRoomData = new RoomData(RoomType.Normal, new List<Point>() { point[0] }, point[1]);
         }
@@ -459,7 +464,7 @@ public class MapManager : MonoBehaviour
 
                         for (int i = 0; i < Constant.tripleRoomCheck.GetLength(1); i++)
                         {
-                            if (map[point[0].x + Constant.tripleRoomCheck[(int)dir, i].x, point[0].y + Constant.tripleRoomCheck[(int)dir, i].y] == 1)
+                            if (map.Contains(new Point(point[0] + Constant.tripleRoomCheck[(int)dir, i])))
                             {
                                 canCreate = false;
                                 break;
@@ -476,6 +481,7 @@ public class MapManager : MonoBehaviour
                         }
                     }
                 }
+                randomDirList.RemoveAt(randomIndex);
             }
             newRoomData = new RoomData(RoomType.Normal, new List<Point>() { point[0] }, point[1]);
         }

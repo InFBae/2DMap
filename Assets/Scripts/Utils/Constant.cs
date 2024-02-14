@@ -20,9 +20,15 @@ public static class Constant
     };
 }
 
-public struct Point 
+public struct Point : IEquatable<Point>
 {
     public int x, y;
+
+    public Point(Point p)
+    {
+        this.x = p.x;
+        this.y = p.y;
+    }
 
     public Point(int x, int y)
     {
@@ -30,9 +36,35 @@ public struct Point
         this.y = y;
     }
 
+    public override bool Equals(object obj)
+    {
+        return obj is Point point && Equals(point);
+    }
+
+    public bool Equals(Point other)
+    {
+        return x == other.x &&
+               y == other.y;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(x, y);        
+    }
+
     public static Point operator + (Point a, Point b)
     {
         return new Point(a.x+b.x, a.y+b.y);
+    }
+
+    public static bool operator == (Point a, Point b)
+    {
+        return a.x == b.x && a.y == b.y;
+    }
+
+    public static bool operator != (Point a, Point b)
+    {
+        return a.x != b.x || a.y != b.y;
     }
 }
 
