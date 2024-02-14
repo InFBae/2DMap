@@ -29,10 +29,10 @@ public class MapUI : BaseUI
         GetComponentInChildren<Toggle>().onValueChanged.RemoveListener(ChangeCreateMode);
     }
 
-    private void ChangeCurrentRoomText(int roomListCount, int tempRoomCount)
+    private void ChangeCurrentRoomText(int roomCount)
     {
         texts["TargetCountText"].text = mapManager.targetData.createRoomCount.ToString();
-        texts["CurrentCountText"].text = (roomListCount + tempRoomCount).ToString();
+        texts["CurrentCountText"].text = roomCount.ToString();
     }
 
     private void ChangeCreateMode(bool quickMode)

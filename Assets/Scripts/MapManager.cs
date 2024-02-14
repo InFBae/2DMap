@@ -21,7 +21,7 @@ public class MapManager : MonoBehaviour
     public bool resume = false;
     WaitUntil waitUntilResume;
 
-    public UnityEvent<int, int> RoomCountChanged = new UnityEvent<int, int>();
+    public UnityEvent<int> RoomCountChanged = new UnityEvent<int>();
 
     private void Awake()
     {
@@ -59,7 +59,7 @@ public class MapManager : MonoBehaviour
         roomList.Add(startRoomInstance);
         roomGenQueue.Enqueue(startRoom);
 
-        RoomCountChanged?.Invoke(roomList.Count, 0);
+        RoomCountChanged?.Invoke(roomList.Count);
 
         map[curPoint.x, curPoint.y] = 1;
         
@@ -111,7 +111,7 @@ public class MapManager : MonoBehaviour
 
                     created.Add(roomInstance);
 
-                    RoomCountChanged?.Invoke(roomList.Count, created.Count);
+                    RoomCountChanged?.Invoke(roomList.Count + created.Count);
 
                     creatable = CreatableSpaceCheck(curRoomData);
                 }               
@@ -135,7 +135,7 @@ public class MapManager : MonoBehaviour
                 Destroy(created[randomIndex].gameObject);                 
                 created.RemoveAt(randomIndex);
 
-                RoomCountChanged?.Invoke(roomList.Count, created.Count);
+                RoomCountChanged?.Invoke(roomList.Count + created.Count);
             }
               
             for(int i = 0; i < created.Count; i++)
@@ -281,7 +281,7 @@ public class MapManager : MonoBehaviour
 
                 created.RemoveAt(randomIndex);
 
-                RoomCountChanged?.Invoke(roomList.Count, created.Count);
+                RoomCountChanged?.Invoke(roomList.Count + created.Count);
             }
 
             for (int i = 0; i < created.Count; i++)
@@ -342,7 +342,7 @@ public class MapManager : MonoBehaviour
             GameObject pathInstance = Instantiate(Resources.Load<GameObject>("Map/Path"), roomInstance.transform);
             pathInstance.transform.position = new Vector2((roomInstance.roomData.points[0].x + roomInstance.roomData.connectedPoint.x) * 6, (roomInstance.roomData.points[0].y + roomInstance.roomData.connectedPoint.y) * 6);            
         }
-        RoomCountChanged?.Invoke(roomList.Count, 0);
+        RoomCountChanged?.Invoke(roomList.Count);
 
         Debug.Log("Create Completed!");
 
@@ -358,7 +358,7 @@ public class MapManager : MonoBehaviour
         if (mapContainer != null)
         {
             Destroy(mapContainer);
-            RoomCountChanged?.Invoke(0, 0);
+            RoomCountChanged?.Invoke(0);
         }        
         StopAllCoroutines();
         resume = false;
