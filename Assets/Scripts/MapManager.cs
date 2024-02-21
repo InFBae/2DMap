@@ -24,8 +24,7 @@ public class MapManager : MonoBehaviour
     public UnityEvent<int> RoomCountChanged = new UnityEvent<int>();
 
     private void Awake()
-    {
-        cam = FindObjectOfType<Camera>();
+    {        
         waitUntilResume = new WaitUntil(() => resume);
         map = new HashSet<Point>(); 
     }
@@ -33,10 +32,18 @@ public class MapManager : MonoBehaviour
     public void StartCreate()
     {
         ResetMap();
-        targetData = new MapData(mapDataUI.mapData);
-        map.Clear();
+        targetData = new MapData(mapDataUI.mapData);      
         if (quickMake) { QuickCreateMap(); }
         else { StartCoroutine(CreateMapRoutine()); }
+    }
+
+    private void MoveCamera(Vector3 pos)
+    {
+        if (cam == null)
+        {
+            cam = FindObjectOfType<Camera>();
+        }
+        cam.transform.position = pos;
     }
 
     private IEnumerator CreateMapRoutine()
@@ -54,7 +61,7 @@ public class MapManager : MonoBehaviour
         RoomBase startRoomInstance = Instantiate(Resources.Load<RoomBase>($"Map/{startRoom.roomType}Room"), mapContainer.transform);
         startRoomInstance.roomData = startRoom;
         startRoomInstance.transform.position = new Vector2(startRoom.points[0].x * 12, startRoom.points[0].y * 12);
-        cam.transform.position = new Vector3(startRoom.points[0].x * 12, startRoom.points[0].y * 12, -10);
+        MoveCamera(new Vector3(startRoom.points[0].x * 12, startRoom.points[0].y * 12, -10));
 
         roomList.Add(startRoomInstance);
         roomGenQueue.Enqueue(startRoom);
@@ -221,7 +228,7 @@ public class MapManager : MonoBehaviour
         RoomData startRoom = new RoomData(RoomType.Start, new List<Point>() { curPoint }, curPoint);
         startRoom.depth = 0;
 
-        cam.transform.position = new Vector3(startRoom.points[0].x * 12, startRoom.points[0].y * 12, -10);
+        MoveCamera(new Vector3(startRoom.points[0].x * 12, startRoom.points[0].y * 12, -10));
 
         roomList.Add(startRoom);
         roomGenQueue.Enqueue(startRoom);
@@ -366,12 +373,14 @@ public class MapManager : MonoBehaviour
         }        
         StopAllCoroutines();
         resume = false;
+        map.Clear();
     }
 
     private List<Point[]> CreatableSpaceCheck(RoomData curRoomData)
     {
         List<Point[]> creatable = new List<Point[]>();
 
+        // 작은 방의 경우 앏은 쪽 벽으로는 방을 생성할 수 없음
         if (curRoomData.roomType == RoomType.Small)
         {
             for (int j = curRoomData.dir * 2; j < (curRoomData.dir * 2) + 2; j++)
@@ -403,82 +412,61 @@ public class MapManager : MonoBehaviour
         RoomData newRoomData;
         if (roomType == RoomType.Double)
         {
-            List<DoubleRoomDir> randomDirList = new List<DoubleRoomDir>();
+            List<int> randomDirList = new List<int>();
             foreach (DoubleRoomDir dir in Enum.GetValues(typeof(DoubleRoomDir)))
             {
-                randomDirList.Add(dir);
+                randomDirList.Add((int)dir);
             }
 
             while (randomDirList.Count > 0)
             {
                 int randomIndex = Random.Range(0, randomDirList.Count);
-                foreach (DoubleRoomDir dir in Enum.GetValues(typeof(DoubleRoomDir)))
-                {
-                    if (randomDirList[randomIndex] == dir)
-                    {
-                        if (!map.Contains(new Point(point[0] + Constant.dir[(int)dir])))
-                        {
-                            newRoomData = new RoomData(roomType, new List<Point>() { point[0], point[0] + Constant.dir[(int)dir] }, point[1], (int)dir);
-                            return newRoomData;
-                        }
-                    }
-                }
+                                        
+                if (!map.Contains(new Point(point[0] + Constant.dir[randomDirList[randomIndex]])))
+                    return new RoomData(roomType, new List<Point>() { point[0], point[0] + Constant.dir[randomDirList[randomIndex]] }, point[1], randomDirList[randomIndex]);
+                
                 randomDirList.RemoveAt(randomIndex);
             }
+            // 모든 방향에서 Double 방 생성이 불가능하면 일반 방 생성
             newRoomData = new RoomData(RoomType.Normal, new List<Point>() { point[0] }, point[1]);
         }
         else if (roomType == RoomType.Triple)
         {
-            List<TripleRoomDir> randomDirList = new List<TripleRoomDir>();
+            List<int> randomDirList = new List<int>();
             foreach (TripleRoomDir dir in Enum.GetValues(typeof(TripleRoomDir)))
             {
-                randomDirList.Add(dir);
+                randomDirList.Add((int)dir);
             }
             
             while (randomDirList.Count > 0)
             {
                 int randomIndex = Random.Range(0, randomDirList.Count);
-                foreach (TripleRoomDir dir in Enum.GetValues(typeof(TripleRoomDir)))
-                {
-                    if (randomDirList[randomIndex] == dir)
-                    {
-                        bool canCreate = true;
-                        List<Point> points = new List<Point>();
-                        points.Add(point[0]);
 
-                        for (int i = 0; i < Constant.tripleRoomCheck.GetLength(1); i++)
-                        {
-                            if (map.Contains(new Point(point[0] + Constant.tripleRoomCheck[(int)dir, i])))
-                            {
-                                canCreate = false;
-                                break;
-                            }
-                            else
-                            {
-                                points.Add(point[0] + Constant.tripleRoomCheck[(int)dir, i]);
-                            }
-                        }
-                        if (canCreate)
-                        {
-                            newRoomData = new RoomData(roomType, points, point[1], (int)dir);
-                            return newRoomData;
-                        }
+                // 실제로 막힌 부분을 확인할 때까지 생성이 가능하다고 가정
+                bool canCreate = true;
+                List<Point> points = new List<Point>();
+                points.Add(point[0]);
+
+                for (int i = 0; i < Constant.tripleRoomCheck.GetLength(1); i++)
+                {
+                    if (map.Contains(new Point(point[0] + Constant.tripleRoomCheck[randomDirList[randomIndex], i])))
+                    {
+                        canCreate = false;
+                        break;
                     }
+                    points.Add(point[0] + Constant.tripleRoomCheck[randomDirList[randomIndex], i]);                       
                 }
+                if (canCreate)
+                    return new RoomData(roomType, points, point[1], randomDirList[randomIndex]);
+                
                 randomDirList.RemoveAt(randomIndex);
             }
             newRoomData = new RoomData(RoomType.Normal, new List<Point>() { point[0] }, point[1]);
         }
         else
         {
-            if (point[0].x == point[1].x)
-            {
-                newRoomData = new RoomData(roomType, new List<Point>() { point[0] }, point[1], 1);
-            }
-            else
-            {
-                newRoomData = new RoomData(roomType, new List<Point>() { point[0] }, point[1], 0);
-            }
+            // 이전 방과 연결방향에 맞게 방향 설정
+            newRoomData = point[0].x == point[1].x ? new RoomData(roomType, new List<Point>() { point[0] }, point[1], 1) : new RoomData(roomType, new List<Point>() { point[0] }, point[1], 0);
         }
         return newRoomData;
     }
@@ -516,8 +504,6 @@ public class MapManager : MonoBehaviour
         {
             path.Add(pathStack.Pop());
         }
-
-        Debug.Log(path.Count);
 
         return path;
     }
