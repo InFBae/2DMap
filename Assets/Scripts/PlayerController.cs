@@ -20,6 +20,13 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    public void SetCurRoom(RoomBase curRoom, MapManager mapManager)
+    {
+        this.curRoom = curRoom;
+        transform.position = curRoom.transform.position;
+        this.mapManager = mapManager;
+    }
+
     public void MoveRoom(RoomBase dest)
     {
         StartCoroutine(MoveRoomRoutine(dest));
