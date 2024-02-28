@@ -84,12 +84,12 @@ public class MapManager : MonoBehaviour
                     }                              
 
                     created.Add(CreateRoomInstance(createdRoom, roomList.Count + created.Count));
-
                     RoomCountChanged?.Invoke(roomList.Count + created.Count);
 
                     creatable = CreatableSpaceCheck(curRoomData);
                 }               
             }
+
             yield return waitUntilResume;
             resume = false;
 
@@ -97,6 +97,7 @@ public class MapManager : MonoBehaviour
             removeCount = created.Count - removeCount > leftRoomCount ? created.Count - leftRoomCount : removeCount;
             leftRoomCount -= (created.Count - removeCount);
 
+            // 위에서 랜덤으로 뽑은 수만큼 방 삭제
             for (int i = 0; i < removeCount; i++)
             {
                 int randomIndex = Random.Range(0, created.Count);
@@ -108,8 +109,6 @@ public class MapManager : MonoBehaviour
 
                 Destroy(created[randomIndex].gameObject);                 
                 created.RemoveAt(randomIndex);
-
-                RoomCountChanged?.Invoke(roomList.Count + created.Count);
             }
               
             for(int i = 0; i < created.Count; i++)
@@ -138,29 +137,25 @@ public class MapManager : MonoBehaviour
             {
                 targetData.bossRoomCount--;
                 blockedRooms[randomRoomIndex].roomData.roomType = RoomType.Boss;
-                blockedRooms[randomRoomIndex].roomData.dir %= 2;
             }
             else if (targetData.treasureRoomCount > 0)
             {
                 targetData.treasureRoomCount--;
                 blockedRooms[randomRoomIndex].roomData.roomType = RoomType.Treasure;
-                blockedRooms[randomRoomIndex].roomData.dir %= 2;
             }
             else if (targetData.shopRoomCount > 0)
             {
                 targetData.shopRoomCount--;
-                blockedRooms[randomRoomIndex].roomData.roomType = RoomType.Shop;
-                blockedRooms[randomRoomIndex].roomData.dir %= 2;
+                blockedRooms[randomRoomIndex].roomData.roomType = RoomType.Shop;                
             }
             else
             {
                 break;
             }
 
+            blockedRooms[randomRoomIndex].roomData.dir %= 2;
             CreateRoomInstance(blockedRooms[randomRoomIndex].roomData, blockedRooms[randomRoomIndex].RoomId);
-
             Destroy(blockedRooms[randomRoomIndex].gameObject);
-
             blockedRooms.RemoveAt(randomRoomIndex);
 
             yield return waitUntilResume;
@@ -203,17 +198,7 @@ public class MapManager : MonoBehaviour
 
                 while (creatable.Count > 0)
                 {
-                    RoomType newRoomType;
-
-                    int randomSize = Random.Range(0, 10000);
-                    if (randomSize < targetData.smallRoomRatio * 100) { newRoomType = RoomType.Small; }
-                    else if (randomSize > (100 - targetData.bigRoomRatio) * 100)
-                    {
-                        int randomBig = Random.Range(0, 100);
-                        if (randomBig > 70) { newRoomType = RoomType.Triple; }
-                        else { newRoomType = RoomType.Double; }
-                    }
-                    else { newRoomType = RoomType.Normal; }
+                    RoomType newRoomType = GetRandomRoomType();
 
                     RoomData createdRoom = CreateRoomData(creatable[0], newRoomType);
                     createdRoom.beforeNode = curRoomData;
@@ -269,54 +254,38 @@ public class MapManager : MonoBehaviour
             if (targetData.bossRoomCount > 0)
             {
                 targetData.bossRoomCount--;
-                blockedRooms[randomRoomIndex].roomType = RoomType.Boss;
-                blockedRooms[randomRoomIndex].dir %= 2;
+                blockedRooms[randomRoomIndex].roomType = RoomType.Boss;              
             }
             else if (targetData.treasureRoomCount > 0)
             {
                 targetData.treasureRoomCount--;
                 blockedRooms[randomRoomIndex].roomType = RoomType.Treasure;
-                blockedRooms[randomRoomIndex].dir %= 2;
             }
             else if (targetData.shopRoomCount > 0)
             {
                 targetData.shopRoomCount--;
                 blockedRooms[randomRoomIndex].roomType = RoomType.Shop;
-                blockedRooms[randomRoomIndex].dir %= 2;
             }
             else
             {
                 break;
-            }           
-
+            }
+            blockedRooms[randomRoomIndex].dir %= 2;
             blockedRooms.RemoveAt(randomRoomIndex);
         }
 
-        RoomBase startRoomInstance = Instantiate(Resources.Load<RoomBase>($"Map/{roomList[0].roomType}Room"), mapContainer.transform);
-        startRoomInstance.roomData = roomList[0];
-        startRoomInstance.SetDir(roomList[0].dir);
-        startRoomInstance.RoomId = 0;
-        startRoomInstance.transform.position = new Vector2(roomList[0].points[0].x * 12, roomList[0].points[0].y * 12);
+        RoomBase startRoomInstance = CreateRoomInstance(roomList[0], 0);
 
         for (int i = 1; i < roomList.Count; i++)
         {
-            RoomBase roomInstance = Instantiate(Resources.Load<RoomBase>($"Map/{roomList[i].roomType}Room"), mapContainer.transform);
-            roomInstance.roomData = roomList[i];
-            roomInstance.SetDir(roomList[i].dir);
-            roomInstance.RoomId = i;
-            roomInstance.transform.position = new Vector2(roomList[i].points[0].x * 12, roomList[i].points[0].y * 12);
-           
-            GameObject pathInstance = Instantiate(Resources.Load<GameObject>("Map/Path"), roomInstance.transform);
-            pathInstance.transform.position = new Vector2((roomInstance.roomData.points[0].x + roomInstance.roomData.connectedPoint.x) * 6, (roomInstance.roomData.points[0].y + roomInstance.roomData.connectedPoint.y) * 6);            
+            CreateRoomInstance(roomList[i], i);
         }
         RoomCountChanged?.Invoke(roomList.Count);
 
         Debug.Log("Create Completed!");
 
-        playerController.gameObject.SetActive(true);
-        playerController.curRoom = startRoomInstance;
-        playerController.transform.position = startRoomInstance.transform.position;
-        playerController.mapManager = this;
+        playerController.SetCurRoom(startRoomInstance, this);
+        playerController.gameObject.SetActive(true);       
     }
 
     public void ResetMap()
@@ -386,6 +355,7 @@ public class MapManager : MonoBehaviour
         if (roomType == RoomType.Double)
         {
             List<int> randomDirList = new List<int>();
+            // 모든 방향을 확인하도록 리스트에 저장
             foreach (DoubleRoomDir dir in Enum.GetValues(typeof(DoubleRoomDir)))
             {
                 randomDirList.Add((int)dir);
@@ -394,10 +364,10 @@ public class MapManager : MonoBehaviour
             while (randomDirList.Count > 0)
             {
                 int randomIndex = Random.Range(0, randomDirList.Count);
-                                        
+                // 랜덤으로 뽑은 방향이 생성 가능하다면 바로 return                        
                 if (!map.Contains(new Point(point[0] + Constant.dir[randomDirList[randomIndex]])))
                     return new RoomData(roomType, new List<Point>() { point[0], point[0] + Constant.dir[randomDirList[randomIndex]] }, point[1], randomDirList[randomIndex]);
-                
+                // 불가능하다면 방향리스트에서 해당 방향 제거
                 randomDirList.RemoveAt(randomIndex);
             }
             // 모든 방향에서 Double 방 생성이 불가능하면 일반 방 생성
